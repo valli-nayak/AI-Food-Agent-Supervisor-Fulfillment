@@ -1,0 +1,5 @@
+langchain-google-genai
+python-dotenv
+streamlit
+langgraph
+fastapi[standard]
