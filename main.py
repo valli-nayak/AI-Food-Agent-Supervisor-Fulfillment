@@ -18,8 +18,7 @@ async def run_single_user_graph(user_id: int, dish:str):
         "inventory_log": "PENDING", 
         "billing_log": "PENDING", 
         "inventory_token": "", 
-        "next_action": "ParallelValidate", 
-        "suggested_compensation": "NONE", 
+        "next_action": "ParallelValidate",  
         "order_shipped": None, 
         "cooked": None 
     } 
