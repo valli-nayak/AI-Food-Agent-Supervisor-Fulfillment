@@ -13,13 +13,13 @@ To mirror production workloads where multiple customers submit orders simultaneo
 #### 2. Centralized Supervisor Orchestration Pattern
 Instead of using a decentralized, event-driven approach, this project relies on a strict **Orchestrator Saga Design Pattern**:
 * **The Telemetry Brain Node (`supervisor_node`)**: A central supervisor acts as the manager of the entire order state machine, auditing data flags (`inventory_log`, `billing_log`, `cooked`, `order_shipped`) at the close of every atomic step.
-* **Structured Semantic Routing**: Constrained by Pydantic models through Google Gemini (`with_structured_output`), the LLM acts as a deterministic decision boundary, generating precise node target values (`ParallelValidate`, `Kitchen`, `Compensation`, `Shipping`, `FINISH`).
+* **Structured Semantic Routing**: Constrained by Pydantic models through Google Gemini (`with_structured_output`), the LLM acts as a deterministic decision boundary, generating precise node target values (`ParallelValidate`, `Kitchen`, `RollbackInventory`, `Shipping`, `FINISH`).
 
 #### 3. Spin-Lock Concurrency Barriers & Saga Compensations
 Because distributed architectures lack global database-level ACID parameters, data consistency is enforced via explicit lock validation and compensation routines:
 * **Atomic Concurrency Barriers**: 
 The `ParallelValidate` node initiates concurrent checks via `asyncio.gather` to manage both payment card verification and inventory locking. The underlying `CSVInventoryLockManager` uses an exclusive OS file-creation flag (`x` mode) as a rigid barrier. If two instances enter at the same millisecond, the second instance hits an explicit `FileExistsError` and safely marks its internal telemetry tracking log as `CONFLICT_LOCKED`.
-* **Compensating Rollbacks**: If downstream validations drop (such as a billing refusal), the supervisor routes directly to `Compensation`, using the customer's unique `inventory_token` uuid to release the lease via an explicit file teardown (`release_lock()`).
+* **Rollbacks**: If downstream validations drop (such as a billing refusal), the supervisor routes directly to `RollbackInventory`, using the customer's unique `inventory_token` uuid to release the lease via an explicit file teardown (`release_lock()`).
 
 
 ![LangGraph Agent Workflow](workflow_graph.png)

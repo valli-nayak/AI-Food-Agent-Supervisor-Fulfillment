@@ -18,23 +18,20 @@ def supervisor_node(state:FulfillmentState) -> FulfillmentState:
         f"Current Cooking State: {state.get('cooked')}. "
         f"Current Order Shipped State: {state.get('order_shipped')}. "
         "Rules:\n"
-        "1. If order_parsed is missing or None, you MUST select next_action='ParallelValidate' and suggested_compensation='NONE'.\n"
-        "2. If inventory_log is 'CONFLICT_LOCKED' or 'OUT_OF_STOCK' you MUST select next_action='Compensation' and suggested_compensation='NONE'.\n"
-        "3. If billing_log is 'DECLINED' and inventory_log is 'SUCCESS', you MUST select next_action='Compensation' and suggested_compensation='RELEASE_INVENTORY_LEASE'.\n"
-        "4. If BOTH inventory_log and billing_log are 'SUCCESS' and cooked is NOT True, you MUST select next_action='Kitchen' and suggested_compensation='NONE'.\n"
-        "5. If cooked is True and order_shipped is NOT True, you MUST select next_action='Shipping' and suggested_compensation='NONE'.\n"
-        "6. If order_shipped is True, you MUST select next_action='FINISH' and suggested_compensation='NONE'.")
-    
-    
+        "1. If order_parsed is missing or None, you MUST select next_action='ParallelValidate'.\n"
+        "2. If inventory_log is 'CONFLICT_LOCKED' or 'OUT_OF_STOCK', you MUST select next_action='FINISH'.\n" # No lock to release
+        "3. If billing_log is 'DECLINED' and inventory_log is 'SUCCESS', you MUST select next_action='RollbackInventory'.\n" # 🚀 DIRECT PATH!
+        "4. If BOTH inventory_log and billing_log are 'SUCCESS' and cooked is NOT True, you MUST select next_action='Kitchen'.\n"
+        "5. If cooked is True and order_shipped is NOT True, you MUST select next_action='Shipping'.\n"
+        "6. If order_shipped is True, you MUST select next_action='FINISH'.")
+
     # Constrain the model natively to the router schema
     structured_llm = llm.with_structured_output(ParallelSupervisorRouter)
     decision = structured_llm.invoke([HumanMessage(content=prompt)])
     state["next_action"] = decision.next_action
-    state["suggested_compensation"] = decision.suggested_compensation
 
     print(f" |- LLM Reasoning: {decision.reasoning}")
     print(f" |- Route Target: {decision.next_action}")
-    print(f" |- Rollback Rule: {decision.suggested_compensation}")
     return state
 
 async def check_inventory(lock_manager, dish_name, client_token):
@@ -69,15 +66,7 @@ def kitchen_node(state: FulfillmentState):
 def shipping_node(state: FulfillmentState) -> FulfillmentState:
     print("🚚 [Shipping Node] Transport carrier routed. Manifest complete.")
     state["order_shipped"] = True
-    return state
-
-def compensation_router_node(state:FulfillmentState):
-    print(f"🛑 [HUMAN_EXCEPTION] Structural exception node hit. State locked down.")
-    if state["suggested_compensation"] == 'RELEASE_INVENTORY_LEASE':
-        state["next_action"] = "RollbackInventory"
-    else:
-        state["next_action"] = "FINISH"
-    return state        
+    return state   
 
 def rollback_inventory_node(state:FulfillmentState):
     print(f"🔄 [RollbackInventory] Initializing Saga Compensation. Tearing down file lock footprints...")
