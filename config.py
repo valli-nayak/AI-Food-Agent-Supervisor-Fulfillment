@@ -8,10 +8,15 @@ import os
 load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+LANG_CHAIN_API_KEY = os.getenv("LANG_CHAIN_API_KEY")
 
 if not GOOGLE_API_KEY:
     st.error("❌ Missing GOOGLE_API_KEY in the environment setup.")
     st.stop() 
+
+if not os.getenv("LANG_CHAIN_API_KEY"):
+    st.error("❌ Misiing LANG_CHAIN_API_KEY in the environment setup.")
+    st.stop()    
 
 llm = ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite", max_retries=6)
 
